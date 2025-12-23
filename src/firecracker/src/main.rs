@@ -22,7 +22,7 @@ use utils::validators::validate_instance_id;
 use vmm::arch::host_page_size;
 use vmm::builder::StartMicrovmError;
 use vmm::logger::{
-    LOGGER, LoggerConfig, METRICS, ProcessTimeReporter, StoreMetric, debug, error, info,
+    LOGGER, LoggerSpec, METRICS, ProcessTimeReporter, StoreMetric, debug, error, info,
 };
 use vmm::persist::SNAPSHOT_VERSION;
 use vmm::resources::VmResources;
@@ -30,7 +30,7 @@ use vmm::seccomp::BpfThreadMap;
 use vmm::signal_handler::register_signal_handlers;
 use vmm::snapshot::{SnapshotError, get_format_version};
 use vmm::vmm_config::instance_info::{InstanceInfo, VmState};
-use vmm::vmm_config::metrics::{MetricsConfig, MetricsConfigError, init_metrics};
+use vmm::vmm_config::metrics::{MetricsSpecError, MetricsSpec, init_metrics};
 use vmm::{EventManager, FcExitCode, HTTP_MAX_PAYLOAD_SIZE};
 use vmm_sys_util::terminal::Terminal;
 
@@ -58,7 +58,7 @@ enum MainError {
     /// Could not initialize logger: {0}
     LoggerInitialization(vmm::logger::LoggerUpdateError),
     /// Could not initialize metrics: {0}
-    MetricsInitialization(MetricsConfigError),
+    MetricsInitialization(MetricsSpecError),
     /// Seccomp error: {0}
     SeccompFilter(FilterError),
     /// Failed to resize fd table: {0}
@@ -309,7 +309,7 @@ fn main_exec() -> Result<(), MainError> {
     let show_log_origin = arguments.flag_present("show-log-origin").then_some(true);
     let module = arguments.single_value("module").cloned();
     LOGGER
-        .update(LoggerConfig {
+        .update(LoggerSpec {
             log_path,
             level,
             show_level,
@@ -350,7 +350,7 @@ fn main_exec() -> Result<(), MainError> {
     };
 
     if let Some(metrics_path) = arguments.single_value("metrics-path") {
-        let metrics_config = MetricsConfig {
+        let metrics_config = MetricsSpec {
             metrics_path: PathBuf::from(metrics_path),
         };
         init_metrics(metrics_config).map_err(MainError::MetricsInitialization)?;

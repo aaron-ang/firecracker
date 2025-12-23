@@ -29,7 +29,7 @@ use crate::cpu_config::aarch64::{CpuConfiguration, CpuConfigurationError};
 use crate::cpu_config::templates::CustomCpuTemplate;
 use crate::initrd::InitrdConfig;
 use crate::utils::{align_up, u64_to_usize, usize_to_u64};
-use crate::vmm_config::machine_config::MachineConfig;
+use crate::vmm_config::machine_config::MachineSpec;
 use crate::vstate::memory::{
     Address, Bytes, GuestAddress, GuestMemory, GuestMemoryMmap, GuestRegionType,
 };
@@ -90,7 +90,7 @@ pub fn configure_system_for_boot(
     vm: &Vm,
     device_manager: &mut DeviceManager,
     vcpus: &mut [Vcpu],
-    machine_config: &MachineConfig,
+    machine_config: &MachineSpec,
     cpu_template: &CustomCpuTemplate,
     entry_point: EntryPoint,
     initrd: &Option<InitrdConfig>,

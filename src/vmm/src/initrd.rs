@@ -8,7 +8,7 @@ use vm_memory::{GuestAddress, GuestMemory, ReadVolatile, VolatileMemoryError};
 
 use crate::arch::initrd_load_addr;
 use crate::utils::u64_to_usize;
-use crate::vmm_config::boot_source::BootConfig;
+use crate::vmm_config::boot_source::BootSpec;
 use crate::vstate::memory::GuestMemoryMmap;
 
 /// Errors associated with initrd loading.
@@ -38,7 +38,7 @@ pub struct InitrdConfig {
 impl InitrdConfig {
     /// Load initrd into guest memory based on the boot config.
     pub fn from_config(
-        boot_cfg: &BootConfig,
+        boot_cfg: &BootSpec,
         vm_memory: &GuestMemoryMmap,
     ) -> Result<Option<Self>, InitrdError> {
         Ok(match &boot_cfg.initrd_file {

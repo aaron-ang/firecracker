@@ -10,9 +10,9 @@ use crate::devices::virtio::vsock::{Vsock, VsockError, VsockUnixBackend, VsockUn
 
 type MutexVsockUnix = Arc<Mutex<Vsock<VsockUnixBackend>>>;
 
-/// Errors associated with `NetworkInterfaceConfig`.
+/// Errors associated with `NetworkInterfaceSpec`.
 #[derive(Debug, derive_more::From, thiserror::Error, displaydoc::Display)]
-pub enum VsockConfigError {
+pub enum VsockSpecError {
     /// Cannot create backend for vsock device: {0}
     CreateVsockBackend(VsockUnixBackendError),
     /// Cannot create vsock device: {0}
@@ -23,7 +23,7 @@ pub enum VsockConfigError {
 /// from vsock related requests.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct VsockDeviceConfig {
+pub struct VsockDeviceSpec {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     /// ID of the vsock device.
@@ -40,10 +40,10 @@ struct VsockAndUnixPath {
     uds_path: String,
 }
 
-impl From<&VsockAndUnixPath> for VsockDeviceConfig {
+impl From<&VsockAndUnixPath> for VsockDeviceSpec {
     fn from(vsock: &VsockAndUnixPath) -> Self {
         let vsock_lock = vsock.vsock.lock().unwrap();
-        VsockDeviceConfig {
+        VsockDeviceSpec {
             vsock_id: None,
             guest_cid: u32::try_from(vsock_lock.cid()).unwrap(),
             uds_path: vsock.uds_path.clone(),
@@ -51,7 +51,7 @@ impl From<&VsockAndUnixPath> for VsockDeviceConfig {
     }
 }
 
-/// A builder of Vsock with Unix backend from 'VsockDeviceConfig'.
+/// A builder of Vsock with Unix backend from 'VsockDeviceSpec'.
 #[derive(Debug, Default)]
 pub struct VsockBuilder {
     inner: Option<VsockAndUnixPath>,
@@ -78,7 +78,7 @@ impl VsockBuilder {
 
     /// Inserts a Unix backend Vsock in the store.
     /// If an entry already exists, it will overwrite it.
-    pub fn insert(&mut self, cfg: VsockDeviceConfig) -> Result<(), VsockConfigError> {
+    pub fn insert(&mut self, cfg: VsockDeviceSpec) -> Result<(), VsockSpecError> {
         // Make sure to drop the old one and remove the socket before creating a new one.
         if let Some(existing) = self.inner.take() {
             std::fs::remove_file(existing.uds_path).map_err(VsockUnixBackendError::UnixBind)?;
@@ -95,18 +95,18 @@ impl VsockBuilder {
         self.inner.as_ref().map(|pair| &pair.vsock)
     }
 
-    /// Creates a Vsock device from a VsockDeviceConfig.
+    /// Creates a Vsock device from a VsockDeviceSpec.
     pub fn create_unixsock_vsock(
-        cfg: VsockDeviceConfig,
-    ) -> Result<Vsock<VsockUnixBackend>, VsockConfigError> {
+        cfg: VsockDeviceSpec,
+    ) -> Result<Vsock<VsockUnixBackend>, VsockSpecError> {
         let backend = VsockUnixBackend::new(u64::from(cfg.guest_cid), cfg.uds_path)?;
 
-        Vsock::new(u64::from(cfg.guest_cid), backend).map_err(VsockConfigError::CreateVsockDevice)
+        Vsock::new(u64::from(cfg.guest_cid), backend).map_err(VsockSpecError::CreateVsockDevice)
     }
 
     /// Returns the structure used to configure the vsock device.
-    pub fn config(&self) -> Option<VsockDeviceConfig> {
-        self.inner.as_ref().map(VsockDeviceConfig::from)
+    pub fn config(&self) -> Option<VsockDeviceSpec> {
+        self.inner.as_ref().map(VsockDeviceSpec::from)
     }
 }
 
@@ -117,8 +117,8 @@ pub(crate) mod tests {
     use super::*;
     use crate::devices::virtio::vsock::VSOCK_DEV_ID;
 
-    pub(crate) fn default_config(tmp_sock_file: &TempFile) -> VsockDeviceConfig {
-        VsockDeviceConfig {
+    pub(crate) fn default_config(tmp_sock_file: &TempFile) -> VsockDeviceSpec {
+        VsockDeviceSpec {
             vsock_id: None,
             guest_cid: 3,
             uds_path: tmp_sock_file.as_path().to_str().unwrap().to_string(),

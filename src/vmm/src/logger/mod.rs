@@ -10,7 +10,7 @@ mod metrics;
 pub use log::{Level, debug, error, info, log_enabled, trace, warn};
 pub use logging::{
     DEFAULT_INSTANCE_ID, DEFAULT_LEVEL, INSTANCE_ID, LOGGER, LevelFilter, LevelFilterFromStrError,
-    LoggerConfig, LoggerInitError, LoggerUpdateError,
+    LoggerInitError, LoggerSpec, LoggerUpdateError,
 };
 pub use metrics::{
     IncMetric, LatencyAggregateMetrics, METRICS, MetricsError, ProcessTimeReporter,

@@ -3,14 +3,14 @@
 
 use vmm::logger::{IncMetric, METRICS};
 use vmm::rpc_interface::VmmAction;
-use vmm::vmm_config::vsock::VsockDeviceConfig;
+use vmm::vmm_config::vsock::VsockDeviceSpec;
 
 use super::super::parsed_request::{ParsedRequest, RequestError};
 use super::Body;
 
 pub(crate) fn parse_put_vsock(body: &Body) -> Result<ParsedRequest, RequestError> {
     METRICS.put_api_requests.vsock_count.inc();
-    let vsock_cfg = serde_json::from_slice::<VsockDeviceConfig>(body.raw()).inspect_err(|_| {
+    let vsock_cfg = serde_json::from_slice::<VsockDeviceSpec>(body.raw()).inspect_err(|_| {
         METRICS.put_api_requests.vsock_fails.inc();
     })?;
 
@@ -23,7 +23,7 @@ pub(crate) fn parse_put_vsock(body: &Body) -> Result<ParsedRequest, RequestError
     }
 
     // Construct the `ParsedRequest` object.
-    let mut parsed_req = ParsedRequest::new_sync(VmmAction::SetVsockDevice(vsock_cfg));
+    let mut parsed_req = ParsedRequest::new_stateless(VmmAction::SetVsockDevice, vsock_cfg);
     // If `vsock_id` was present, set the deprecation message in `parsing_info`.
     if let Some(msg) = deprecation_message {
         parsed_req.parsing_info().append_deprecation_message(msg);

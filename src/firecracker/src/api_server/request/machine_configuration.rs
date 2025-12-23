@@ -3,19 +3,19 @@
 
 use vmm::logger::{IncMetric, METRICS};
 use vmm::rpc_interface::VmmAction;
-use vmm::vmm_config::machine_config::{MachineConfig, MachineConfigUpdate};
+use vmm::vmm_config::machine_config::{MachineSpec, MachineSpecUpdate};
 
 use super::super::parsed_request::{ParsedRequest, RequestError, method_to_error};
 use super::{Body, Method};
 
 pub(crate) fn parse_get_machine_config() -> Result<ParsedRequest, RequestError> {
     METRICS.get_api_requests.machine_cfg_count.inc();
-    Ok(ParsedRequest::new_sync(VmmAction::GetVmMachineConfig))
+    Ok(ParsedRequest::new_sync(VmmAction::GetVmMachineSpec))
 }
 
 pub(crate) fn parse_put_machine_config(body: &Body) -> Result<ParsedRequest, RequestError> {
     METRICS.put_api_requests.machine_cfg_count.inc();
-    let config = serde_json::from_slice::<MachineConfig>(body.raw()).inspect_err(|_| {
+    let config = serde_json::from_slice::<MachineSpec>(body.raw()).inspect_err(|_| {
         METRICS.put_api_requests.machine_cfg_fails.inc();
     })?;
 
@@ -27,12 +27,12 @@ pub(crate) fn parse_put_machine_config(body: &Body) -> Result<ParsedRequest, Req
         deprecation_message = Some("PUT /machine-config: cpu_template field is deprecated.");
     }
 
-    // Convert `MachineConfig` to `MachineConfigUpdate`.
-    let config_update = MachineConfigUpdate::from(config);
+    // Convert `MachineSpec` to `MachineSpecUpdate`.
+    let config_update = MachineSpecUpdate::from(config);
 
     // Construct the `ParsedRequest` object.
     let mut parsed_req =
-        ParsedRequest::new_sync(VmmAction::UpdateMachineConfiguration(config_update));
+        ParsedRequest::new_stateless(VmmAction::UpdateMachineSpec, config_update);
     // If `cpu_template` was present, set the deprecation message in `parsing_info`.
     if let Some(msg) = deprecation_message {
         parsed_req.parsing_info().append_deprecation_message(msg);
@@ -44,7 +44,7 @@ pub(crate) fn parse_put_machine_config(body: &Body) -> Result<ParsedRequest, Req
 pub(crate) fn parse_patch_machine_config(body: &Body) -> Result<ParsedRequest, RequestError> {
     METRICS.patch_api_requests.machine_cfg_count.inc();
     let config_update =
-        serde_json::from_slice::<MachineConfigUpdate>(body.raw()).inspect_err(|_| {
+        serde_json::from_slice::<MachineSpecUpdate>(body.raw()).inspect_err(|_| {
             METRICS.patch_api_requests.machine_cfg_fails.inc();
         })?;
 
@@ -62,7 +62,7 @@ pub(crate) fn parse_patch_machine_config(body: &Body) -> Result<ParsedRequest, R
 
     // Construct the `ParsedRequest` object.
     let mut parsed_req =
-        ParsedRequest::new_sync(VmmAction::UpdateMachineConfiguration(config_update));
+        ParsedRequest::new_stateless(VmmAction::UpdateMachineSpec, config_update);
     // If `cpu_template` was present, set the deprecation message in `parsing_info`.
     if let Some(msg) = deprecation_message {
         parsed_req.parsing_info().append_deprecation_message(msg);
@@ -116,7 +116,7 @@ mod tests {
                 "huge_pages": "{huge_page}"
             }}"#
             );
-            let expected_config = MachineConfigUpdate {
+            let expected_config = MachineSpecUpdate {
                 vcpu_count: Some(8),
                 mem_size_mib: Some(1024),
                 smt: Some(false),
@@ -128,7 +128,7 @@ mod tests {
             };
             assert_eq!(
                 vmm_action_from_request(parse_put_machine_config(&Body::new(body)).unwrap()),
-                VmmAction::UpdateMachineConfiguration(expected_config)
+                VmmAction::UpdateMachineSpec(expected_config)
             );
         }
 
@@ -137,7 +137,7 @@ mod tests {
             "mem_size_mib": 1024,
             "cpu_template": "None"
         }"#;
-        let expected_config = MachineConfigUpdate {
+        let expected_config = MachineSpecUpdate {
             vcpu_count: Some(8),
             mem_size_mib: Some(1024),
             smt: Some(false),
@@ -149,7 +149,7 @@ mod tests {
         };
         assert_eq!(
             vmm_action_from_request(parse_put_machine_config(&Body::new(body)).unwrap()),
-            VmmAction::UpdateMachineConfiguration(expected_config)
+            VmmAction::UpdateMachineSpec(expected_config)
         );
 
         let body = r#"{
@@ -158,7 +158,7 @@ mod tests {
             "smt": false,
             "track_dirty_pages": true
         }"#;
-        let expected_config = MachineConfigUpdate {
+        let expected_config = MachineSpecUpdate {
             vcpu_count: Some(8),
             mem_size_mib: Some(1024),
             smt: Some(false),
@@ -170,7 +170,7 @@ mod tests {
         };
         assert_eq!(
             vmm_action_from_request(parse_put_machine_config(&Body::new(body)).unwrap()),
-            VmmAction::UpdateMachineConfiguration(expected_config)
+            VmmAction::UpdateMachineSpec(expected_config)
         );
 
         // 4. Test that applying a CPU template is successful on x86_64 while on aarch64, it is not.
@@ -183,7 +183,7 @@ mod tests {
         }"#;
         #[cfg(target_arch = "x86_64")]
         {
-            let expected_config = MachineConfigUpdate {
+            let expected_config = MachineSpecUpdate {
                 vcpu_count: Some(8),
                 mem_size_mib: Some(1024),
                 smt: Some(false),
@@ -195,7 +195,7 @@ mod tests {
             };
             assert_eq!(
                 vmm_action_from_request(parse_put_machine_config(&Body::new(body)).unwrap()),
-                VmmAction::UpdateMachineConfiguration(expected_config)
+                VmmAction::UpdateMachineSpec(expected_config)
             );
         }
         #[cfg(target_arch = "aarch64")]
@@ -210,7 +210,7 @@ mod tests {
             "smt": true,
             "track_dirty_pages": true
         }"#;
-        let expected_config = MachineConfigUpdate {
+        let expected_config = MachineSpecUpdate {
             vcpu_count: Some(8),
             mem_size_mib: Some(1024),
             smt: Some(true),
@@ -222,7 +222,7 @@ mod tests {
         };
         assert_eq!(
             vmm_action_from_request(parse_put_machine_config(&Body::new(body)).unwrap()),
-            VmmAction::UpdateMachineConfiguration(expected_config)
+            VmmAction::UpdateMachineSpec(expected_config)
         );
 
         // 6. Test nonsense values for huge page size

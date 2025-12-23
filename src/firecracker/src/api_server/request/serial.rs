@@ -4,17 +4,20 @@
 use micro_http::Body;
 use vmm::logger::{IncMetric, METRICS};
 use vmm::rpc_interface::VmmAction;
-use vmm::vmm_config::serial::SerialConfig;
+use vmm::vmm_config::serial::SerialSpec;
 
 use crate::api_server::parsed_request::{ParsedRequest, RequestError};
 
 pub(crate) fn parse_put_serial(body: &Body) -> Result<ParsedRequest, RequestError> {
     METRICS.put_api_requests.serial_count.inc();
-    let res = serde_json::from_slice::<SerialConfig>(body.raw());
+    let res = serde_json::from_slice::<SerialSpec>(body.raw());
     let config = res.inspect_err(|_| {
         METRICS.put_api_requests.serial_fails.inc();
     })?;
-    Ok(ParsedRequest::new_sync(VmmAction::ConfigureSerial(config)))
+    Ok(ParsedRequest::new_stateless(
+        VmmAction::ConfigureSerial,
+        config,
+    ))
 }
 
 #[cfg(test)]
@@ -28,7 +31,7 @@ mod tests {
     fn test_parse_put_serial_request() {
         let body = r#"{"serial_out_path": "serial"}"#;
 
-        let expected_config = SerialConfig {
+        let expected_config = SerialSpec {
             serial_out_path: Some(PathBuf::from("serial")),
         };
         assert_eq!(

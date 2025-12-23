@@ -12,10 +12,10 @@ use crate::builder::build_microvm_for_boot;
 use crate::resources::VmResources;
 use crate::seccomp::get_empty_filters;
 use crate::test_utils::mock_resources::{MockBootSourceConfig, MockVmConfig, MockVmResources};
-use crate::vmm_config::boot_source::BootSourceConfig;
+use crate::vmm_config::boot_source::BootSourceSpec;
 use crate::vmm_config::instance_info::InstanceInfo;
 use crate::vmm_config::machine_config::HugePageConfig;
-use crate::vmm_config::memory_hotplug::MemoryHotplugConfig;
+use crate::vmm_config::memory_hotplug::MemoryHotplugSpec;
 use crate::vstate::memory::{self, GuestMemoryMmap, GuestRegionMmap, GuestRegionMmapExt};
 use crate::{EventManager, Vmm};
 
@@ -80,9 +80,9 @@ pub fn create_vmm(
 
     let boot_source_cfg = MockBootSourceConfig::new().with_default_boot_args();
     #[cfg(target_arch = "aarch64")]
-    let boot_source_cfg: BootSourceConfig = boot_source_cfg.into();
+    let boot_source_cfg: BootSourceSpec = boot_source_cfg.into();
     #[cfg(target_arch = "x86_64")]
-    let boot_source_cfg: BootSourceConfig = match _kernel_image {
+    let boot_source_cfg: BootSourceSpec = match _kernel_image {
         Some(kernel) => boot_source_cfg.with_kernel(kernel).into(),
         None => boot_source_cfg.into(),
     };
@@ -98,7 +98,7 @@ pub fn create_vmm(
     resources.pci_enabled = pci_enabled;
 
     if memory_hotplug_enabled {
-        resources.memory_hotplug = Some(MemoryHotplugConfig {
+        resources.memory_hotplug = Some(MemoryHotplugSpec {
             total_size_mib: 1024,
             block_size_mib: 2,
             slot_size_mib: 128,

@@ -9,18 +9,21 @@ use super::Body;
 
 pub(crate) fn parse_put_logger(body: &Body) -> Result<ParsedRequest, RequestError> {
     METRICS.put_api_requests.logger_count.inc();
-    let res = serde_json::from_slice::<vmm::logger::LoggerConfig>(body.raw());
+    let res = serde_json::from_slice::<vmm::logger::LoggerSpec>(body.raw());
     let config = res.inspect_err(|_| {
         METRICS.put_api_requests.logger_fails.inc();
     })?;
-    Ok(ParsedRequest::new_sync(VmmAction::ConfigureLogger(config)))
+    Ok(ParsedRequest::new_stateless(
+        VmmAction::ConfigureLogger,
+        config,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use vmm::logger::{LevelFilter, LoggerConfig};
+    use vmm::logger::{LevelFilter, LoggerSpec};
 
     use super::*;
     use crate::api_server::parsed_request::tests::vmm_action_from_request;
@@ -34,7 +37,7 @@ mod tests {
                 "show_log_origin": false
               }"#;
 
-        let expected_config = LoggerConfig {
+        let expected_config = LoggerSpec {
             log_path: Some(PathBuf::from("log")),
             level: Some(LevelFilter::Warn),
             show_level: Some(false),
@@ -53,7 +56,7 @@ mod tests {
                 "show_log_origin": false
               }"#;
 
-        let expected_config = LoggerConfig {
+        let expected_config = LoggerSpec {
             log_path: Some(PathBuf::from("log")),
             level: Some(LevelFilter::Debug),
             show_level: Some(false),

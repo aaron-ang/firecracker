@@ -11,7 +11,7 @@ use crate::devices::virtio::generated::virtio_ids::VIRTIO_ID_PMEM;
 use crate::devices::virtio::persist::{PersistError as VirtioStateError, VirtioDeviceState};
 use crate::devices::virtio::pmem::{PMEM_NUM_QUEUES, PMEM_QUEUE_SIZE};
 use crate::snapshot::Persist;
-use crate::vmm_config::pmem::PmemConfig;
+use crate::vmm_config::pmem::PmemSpec;
 use crate::vstate::memory::{GuestMemoryMmap, GuestRegionMmap};
 use crate::vstate::vm::VmError;
 
@@ -19,7 +19,7 @@ use crate::vstate::vm::VmError;
 pub struct PmemState {
     pub virtio_state: VirtioDeviceState,
     pub config_space: ConfigSpace,
-    pub config: PmemConfig,
+    pub config: PmemSpec,
 }
 
 #[derive(Debug)]
@@ -89,7 +89,7 @@ mod tests {
         let dummy_file = TempFile::new().unwrap();
         dummy_file.as_file().set_len(0x20_0000);
         let dummy_path = dummy_file.as_path().to_str().unwrap().to_string();
-        let config = PmemConfig {
+        let config = PmemSpec {
             id: "1".into(),
             path_on_host: dummy_path,
             root_device: true,

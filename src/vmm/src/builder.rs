@@ -46,8 +46,8 @@ use crate::seccomp::BpfThreadMap;
 use crate::snapshot::Persist;
 use crate::utils::mib_to_bytes;
 use crate::vmm_config::instance_info::InstanceInfo;
-use crate::vmm_config::machine_config::MachineConfigError;
-use crate::vmm_config::memory_hotplug::MemoryHotplugConfig;
+use crate::vmm_config::machine_config::MachineSpecError;
+use crate::vmm_config::memory_hotplug::MemoryHotplugSpec;
 use crate::vstate::kvm::{Kvm, KvmError};
 use crate::vstate::memory::GuestRegionMmap;
 #[cfg(target_arch = "aarch64")]
@@ -110,7 +110,7 @@ pub enum StartMicrovmError {
     /// Cannot restore microvm state: {0}
     RestoreMicrovmState(MicrovmStateError),
     /// Cannot set vm resources: {0}
-    SetVmResources(MachineConfigError),
+    SetVmResources(MachineSpecError),
     /// Cannot create the entropy device: {0}
     CreateEntropyDevice(crate::devices::virtio::rng::EntropyError),
     /// Failed to allocate guest resource: {0}
@@ -406,7 +406,7 @@ pub enum BuildMicrovmFromSnapshotError {
     /// Failed to restore microVM state: {0}
     RestoreState(#[from] crate::vstate::vm::ArchVmError),
     /// Failed to update microVM configuration: {0}
-    VmUpdateConfig(#[from] MachineConfigError),
+    VmUpdateConfig(#[from] MachineSpecError),
     /// Failed to restore MMIO device: {0}
     RestoreMmioDevice(#[from] MicrovmStateError),
     /// Failed to emulate MMIO serial: {0}
@@ -624,7 +624,7 @@ fn attach_virtio_mem_device(
     device_manager: &mut DeviceManager,
     vm: &Arc<Vm>,
     cmdline: &mut LoaderKernelCmdline,
-    config: &MemoryHotplugConfig,
+    config: &MemoryHotplugSpec,
     event_manager: &mut EventManager,
     addr: GuestAddress,
 ) -> Result<(), StartMicrovmError> {
@@ -759,14 +759,14 @@ pub(crate) mod tests {
     use crate::mmds::data_store::{Mmds, MmdsVersion};
     use crate::mmds::ns::MmdsNetworkStack;
     use crate::utils::mib_to_bytes;
-    use crate::vmm_config::balloon::{BALLOON_DEV_ID, BalloonBuilder, BalloonDeviceConfig};
+    use crate::vmm_config::balloon::{BALLOON_DEV_ID, BalloonBuilder, BalloonDeviceSpec};
     use crate::vmm_config::boot_source::DEFAULT_KERNEL_CMDLINE;
-    use crate::vmm_config::drive::{BlockBuilder, BlockDeviceConfig};
-    use crate::vmm_config::entropy::{EntropyDeviceBuilder, EntropyDeviceConfig};
-    use crate::vmm_config::net::{NetBuilder, NetworkInterfaceConfig};
-    use crate::vmm_config::pmem::{PmemBuilder, PmemConfig};
+    use crate::vmm_config::drive::{BlockBuilder, BlockDeviceSpec};
+    use crate::vmm_config::entropy::{EntropyDeviceBuilder, EntropyDeviceSpec};
+    use crate::vmm_config::net::{NetBuilder, NetworkInterfaceSpec};
+    use crate::vmm_config::pmem::{PmemBuilder, PmemSpec};
     use crate::vmm_config::vsock::tests::default_config;
-    use crate::vmm_config::vsock::{VsockBuilder, VsockDeviceConfig};
+    use crate::vmm_config::vsock::{VsockBuilder, VsockDeviceSpec};
     use crate::vstate::vm::tests::setup_vm_with_memory;
 
     #[derive(Debug)]
@@ -850,7 +850,7 @@ pub(crate) mod tests {
         for custom_block_cfg in custom_block_cfgs {
             block_files.push(TempFile::new().unwrap());
 
-            let block_device_config = BlockDeviceConfig {
+            let block_device_config = BlockDeviceSpec {
                 drive_id: String::from(&custom_block_cfg.drive_id),
                 partuuid: custom_block_cfg.partuuid,
                 is_root_device: custom_block_cfg.is_root_device,
@@ -892,7 +892,7 @@ pub(crate) mod tests {
         vmm: &mut Vmm,
         cmdline: &mut Cmdline,
         event_manager: &mut EventManager,
-        net_config: NetworkInterfaceConfig,
+        net_config: NetworkInterfaceSpec,
     ) {
         let mut net_builder = NetBuilder::new();
         net_builder.build(net_config).unwrap();
@@ -911,7 +911,7 @@ pub(crate) mod tests {
         vmm: &mut Vmm,
         cmdline: &mut Cmdline,
         event_manager: &mut EventManager,
-        net_config: NetworkInterfaceConfig,
+        net_config: NetworkInterfaceSpec,
         mmds_version: MmdsVersion,
     ) {
         let mut net_builder = NetBuilder::new();
@@ -938,7 +938,7 @@ pub(crate) mod tests {
         vmm: &mut Vmm,
         cmdline: &mut Cmdline,
         event_manager: &mut EventManager,
-        vsock_config: VsockDeviceConfig,
+        vsock_config: VsockDeviceSpec,
     ) {
         let vsock_dev_id = VSOCK_DEV_ID.to_owned();
         let vsock = VsockBuilder::create_unixsock_vsock(vsock_config).unwrap();
@@ -964,7 +964,7 @@ pub(crate) mod tests {
         vmm: &mut Vmm,
         cmdline: &mut Cmdline,
         event_manager: &mut EventManager,
-        entropy_config: EntropyDeviceConfig,
+        entropy_config: EntropyDeviceSpec,
     ) {
         let mut builder = EntropyDeviceBuilder::new();
         let entropy = builder.build(entropy_config).unwrap();
@@ -989,7 +989,7 @@ pub(crate) mod tests {
         vmm: &mut Vmm,
         cmdline: &mut Cmdline,
         event_manager: &mut EventManager,
-        configs: Vec<PmemConfig>,
+        configs: Vec<PmemSpec>,
     ) -> Vec<TempFile> {
         let mut builder = PmemBuilder::default();
         let mut files = Vec::new();
@@ -1027,7 +1027,7 @@ pub(crate) mod tests {
         vmm: &mut Vmm,
         cmdline: &mut Cmdline,
         event_manager: &mut EventManager,
-        balloon_config: BalloonDeviceConfig,
+        balloon_config: BalloonDeviceSpec,
     ) {
         let mut builder = BalloonBuilder::new();
         builder.set(balloon_config).unwrap();
@@ -1054,7 +1054,7 @@ pub(crate) mod tests {
         let mut event_manager = EventManager::new().expect("Unable to create EventManager");
         let mut vmm = default_vmm();
 
-        let network_interface = NetworkInterfaceConfig {
+        let network_interface = NetworkInterfaceSpec {
             iface_id: String::from("netif"),
             host_dev_name: String::from("hostname"),
             guest_mac: None,
@@ -1267,7 +1267,7 @@ pub(crate) mod tests {
         let mut event_manager = EventManager::new().expect("Unable to create EventManager");
 
         let id = String::from("root");
-        let configs = vec![PmemConfig {
+        let configs = vec![PmemSpec {
             id: id.clone(),
             path_on_host: "".into(),
             root_device: true,
@@ -1301,7 +1301,7 @@ pub(crate) mod tests {
         let mut event_manager = EventManager::new().expect("Unable to create EventManager");
         let mut vmm = default_vmm();
 
-        let balloon_config = BalloonDeviceConfig {
+        let balloon_config = BalloonDeviceSpec {
             amount_mib: 0,
             deflate_on_oom: false,
             stats_polling_interval_s: 0,
@@ -1324,7 +1324,7 @@ pub(crate) mod tests {
         let mut event_manager = EventManager::new().expect("Unable to create EventManager");
         let mut vmm = default_vmm();
 
-        let entropy_config = EntropyDeviceConfig::default();
+        let entropy_config = EntropyDeviceSpec::default();
 
         let mut cmdline = default_kernel_cmdline();
         insert_entropy_device(&mut vmm, &mut cmdline, &mut event_manager, entropy_config);
@@ -1359,7 +1359,7 @@ pub(crate) mod tests {
         vmm: &mut Vmm,
         cmdline: &mut Cmdline,
         event_manager: &mut EventManager,
-        config: MemoryHotplugConfig,
+        config: MemoryHotplugSpec,
     ) {
         attach_virtio_mem_device(
             &mut vmm.device_manager,
@@ -1377,7 +1377,7 @@ pub(crate) mod tests {
         let mut event_manager = EventManager::new().expect("Unable to create EventManager");
         let mut vmm = default_vmm();
 
-        let config = MemoryHotplugConfig {
+        let config = MemoryHotplugSpec {
             total_size_mib: 1024,
             block_size_mib: 2,
             slot_size_mib: 128,

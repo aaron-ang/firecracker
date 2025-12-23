@@ -3,7 +3,7 @@
 
 use vmm::logger::{IncMetric, METRICS};
 use vmm::rpc_interface::VmmAction;
-use vmm::vmm_config::pmem::PmemConfig;
+use vmm::vmm_config::pmem::PmemSpec;
 
 use super::super::parsed_request::{ParsedRequest, RequestError, checked_id};
 use super::{Body, StatusCode};
@@ -20,7 +20,7 @@ pub(crate) fn parse_put_pmem(
         return Err(RequestError::EmptyID);
     };
 
-    let device_cfg = serde_json::from_slice::<PmemConfig>(body.raw()).inspect_err(|_| {
+    let device_cfg = serde_json::from_slice::<PmemSpec>(body.raw()).inspect_err(|_| {
         METRICS.put_api_requests.pmem_fails.inc();
     })?;
 
@@ -31,9 +31,10 @@ pub(crate) fn parse_put_pmem(
             "The id from the path does not match the id from the body!".to_string(),
         ))
     } else {
-        Ok(ParsedRequest::new_sync(VmmAction::InsertPmemDevice(
+        Ok(ParsedRequest::new_stateless(
+            VmmAction::InsertPmemDevice,
             device_cfg,
-        )))
+        ))
     }
 }
 
@@ -64,7 +65,7 @@ mod tests {
         }"#;
         let r = vmm_action_from_request(parse_put_pmem(&Body::new(body), Some("1000")).unwrap());
 
-        let expected_config = PmemConfig {
+        let expected_config = PmemSpec {
             id: "1000".to_string(),
             path_on_host: "dummy".to_string(),
             root_device: true,

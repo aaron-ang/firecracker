@@ -9,7 +9,7 @@ use crate::devices::virtio::pmem::device::{Pmem, PmemError};
 
 /// Errors associated wit the operations allowed on a pmem device
 #[derive(Debug, thiserror::Error, displaydoc::Display)]
-pub enum PmemConfigError {
+pub enum PmemSpecError {
     /// Attempt to add pmem as a root device while the root device defined as a block device
     AddingSecondRootDevice,
     /// A root pmem device already exist
@@ -23,7 +23,7 @@ pub enum PmemConfigError {
 /// Use this structure to setup a Pmem device before boothing the kernel.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct PmemConfig {
+pub struct PmemSpec {
     /// Unique identifier of the device.
     pub id: String,
     /// Path of the drive.
@@ -52,13 +52,9 @@ impl PmemBuilder {
     }
 
     /// Build a device from the config
-    pub fn build(
-        &mut self,
-        config: PmemConfig,
-        has_block_root: bool,
-    ) -> Result<(), PmemConfigError> {
+    pub fn build(&mut self, config: PmemSpec, has_block_root: bool) -> Result<(), PmemSpecError> {
         if config.root_device && has_block_root {
-            return Err(PmemConfigError::AddingSecondRootDevice);
+            return Err(PmemSpecError::AddingSecondRootDevice);
         }
         let position = self
             .devices
@@ -69,14 +65,14 @@ impl PmemBuilder {
                 && config.root_device
                 && self.has_root_device()
             {
-                return Err(PmemConfigError::RootPmemDeviceAlreadyExist);
+                return Err(PmemSpecError::RootPmemDeviceAlreadyExist);
             }
             let pmem = Pmem::new(config)?;
             let pmem = Arc::new(Mutex::new(pmem));
             self.devices[index] = pmem;
         } else {
             if config.root_device && self.has_root_device() {
-                return Err(PmemConfigError::RootPmemDeviceAlreadyExist);
+                return Err(PmemSpecError::RootPmemDeviceAlreadyExist);
             }
             let pmem = Pmem::new(config)?;
             let pmem = Arc::new(Mutex::new(pmem));
@@ -93,7 +89,7 @@ impl PmemBuilder {
     }
 
     /// Returns a vec with the structures used to configure the devices.
-    pub fn configs(&self) -> Vec<PmemConfig> {
+    pub fn configs(&self) -> Vec<PmemSpec> {
         self.devices
             .iter()
             .map(|b| b.lock().unwrap().config.clone())
@@ -114,7 +110,7 @@ mod tests {
         let dummy_file = TempFile::new().unwrap();
         dummy_file.as_file().set_len(Pmem::ALIGNMENT).unwrap();
         let dummy_path = dummy_file.as_path().to_str().unwrap().to_string();
-        let mut config = PmemConfig {
+        let mut config = PmemSpec {
             id: "1".into(),
             path_on_host: dummy_path,
             root_device: true,
@@ -138,7 +134,7 @@ mod tests {
         let dummy_file = TempFile::new().unwrap();
         dummy_file.as_file().set_len(Pmem::ALIGNMENT).unwrap();
         let dummy_path = dummy_file.as_path().to_str().unwrap().to_string();
-        let mut config = PmemConfig {
+        let mut config = PmemSpec {
             id: "1".into(),
             path_on_host: dummy_path,
             root_device: true,
@@ -149,7 +145,7 @@ mod tests {
         config.id = "2".into();
         assert!(matches!(
             builder.build(config.clone(), false).unwrap_err(),
-            PmemConfigError::RootPmemDeviceAlreadyExist,
+            PmemSpecError::RootPmemDeviceAlreadyExist,
         ));
     }
 
@@ -160,7 +156,7 @@ mod tests {
         let dummy_file = TempFile::new().unwrap();
         dummy_file.as_file().set_len(Pmem::ALIGNMENT).unwrap();
         let dummy_path = dummy_file.as_path().to_str().unwrap().to_string();
-        let config = PmemConfig {
+        let config = PmemSpec {
             id: "1".into(),
             path_on_host: dummy_path,
             root_device: true,
@@ -168,7 +164,7 @@ mod tests {
         };
         assert!(matches!(
             builder.build(config, true).unwrap_err(),
-            PmemConfigError::AddingSecondRootDevice,
+            PmemSpecError::AddingSecondRootDevice,
         ));
     }
 }

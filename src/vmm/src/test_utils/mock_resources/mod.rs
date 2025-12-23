@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use crate::cpu_config::templates::CustomCpuTemplate;
 use crate::resources::VmResources;
-use crate::vmm_config::boot_source::BootSourceConfig;
-use crate::vmm_config::machine_config::{MachineConfig, MachineConfigUpdate};
+use crate::vmm_config::boot_source::BootSourceSpec;
+use crate::vmm_config::machine_config::{MachineSpec, MachineSpecUpdate};
 
 pub const DEFAULT_BOOT_ARGS: &str = "reboot=k panic=1 pci=off";
 #[cfg(target_arch = "x86_64")]
@@ -37,11 +37,11 @@ macro_rules! generate_from {
 }
 
 #[derive(Debug)]
-pub struct MockBootSourceConfig(BootSourceConfig);
+pub struct MockBootSourceConfig(BootSourceSpec);
 
 impl MockBootSourceConfig {
     pub fn new() -> MockBootSourceConfig {
-        MockBootSourceConfig(BootSourceConfig {
+        MockBootSourceConfig(BootSourceSpec {
             kernel_image_path: kernel_image_path(None),
             initrd_path: None,
             boot_args: None,
@@ -74,13 +74,13 @@ impl MockVmResources {
         MockVmResources::default()
     }
 
-    pub fn with_boot_source(mut self, boot_source_cfg: BootSourceConfig) -> Self {
+    pub fn with_boot_source(mut self, boot_source_cfg: BootSourceSpec) -> Self {
         self.0.build_boot_source(boot_source_cfg).unwrap();
         self
     }
 
-    pub fn with_vm_config(mut self, vm_config: MachineConfig) -> Self {
-        let machine_config = MachineConfigUpdate::from(vm_config);
+    pub fn with_vm_config(mut self, vm_config: MachineSpec) -> Self {
+        let machine_config = MachineSpecUpdate::from(vm_config);
         self.0.update_machine_config(&machine_config).unwrap();
         self
     }
@@ -91,7 +91,7 @@ impl MockVmResources {
 }
 
 #[derive(Debug, Default)]
-pub struct MockVmConfig(MachineConfig);
+pub struct MockVmConfig(MachineSpec);
 
 impl MockVmConfig {
     pub fn new() -> MockVmConfig {
@@ -104,6 +104,6 @@ impl MockVmConfig {
     }
 }
 
-generate_from!(MockBootSourceConfig, BootSourceConfig);
+generate_from!(MockBootSourceConfig, BootSourceSpec);
 generate_from!(MockVmResources, VmResources);
-generate_from!(MockVmConfig, MachineConfig);
+generate_from!(MockVmConfig, MachineSpec);

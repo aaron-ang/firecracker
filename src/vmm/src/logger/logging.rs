@@ -52,7 +52,7 @@ impl Logger {
     }
 
     /// Applies the given logger configuration the logger.
-    pub fn update(&self, config: LoggerConfig) -> Result<(), LoggerUpdateError> {
+    pub fn update(&self, config: LoggerSpec) -> Result<(), LoggerUpdateError> {
         let mut guard = self.0.lock().unwrap();
         log::set_max_level(
             config
@@ -178,7 +178,7 @@ impl Log for Logger {
 /// Strongly typed structure used to describe the logger.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct LoggerConfig {
+pub struct LoggerSpec {
     /// Named pipe or file used as output for logs.
     pub log_path: Option<PathBuf>,
     /// The level of the Logger.

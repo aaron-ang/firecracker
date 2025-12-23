@@ -22,7 +22,7 @@ pub const DEFAULT_KERNEL_CMDLINE: &str = "reboot=k panic=1 nomodule 8250.nr_uart
 /// microvm.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct BootSourceConfig {
+pub struct BootSourceSpec {
     /// Path of the kernel image.
     pub kernel_image_path: String,
     /// Path of the initrd, if there is one.
@@ -32,9 +32,9 @@ pub struct BootSourceConfig {
     pub boot_args: Option<String>,
 }
 
-/// Errors associated with actions on `BootSourceConfig`.
+/// Errors associated with actions on `BootSourceSpec`.
 #[derive(Debug, thiserror::Error, displaydoc::Display)]
-pub enum BootSourceConfigError {
+pub enum BootSourceSpecError {
     /// The kernel file cannot be opened: {0}
     InvalidKernelPath(io::Error),
     /// The initrd file cannot be opened due to invalid path or invalid permissions. {0}
@@ -47,15 +47,15 @@ pub enum BootSourceConfigError {
 #[derive(Debug, Default)]
 pub struct BootSource {
     /// The boot source configuration.
-    pub config: BootSourceConfig,
+    pub config: BootSourceSpec,
     /// The boot source builder (a boot source allocated and validated).
     /// It is an option cause a resumed microVM does not need it.
-    pub builder: Option<BootConfig>,
+    pub builder: Option<BootSpec>,
 }
 
-/// Holds the kernel builder (created and validates based on BootSourceConfig).
+/// Holds the kernel builder (created and validates based on BootSourceSpec).
 #[derive(Debug)]
-pub struct BootConfig {
+pub struct BootSpec {
     /// The commandline validated against correctness.
     pub cmdline: linux_loader::cmdline::Cmdline,
     /// The descriptor to the kernel file.
@@ -64,10 +64,10 @@ pub struct BootConfig {
     pub initrd_file: Option<File>,
 }
 
-impl BootConfig {
-    /// Creates the BootConfig based on a given configuration.
-    pub fn new(cfg: &BootSourceConfig) -> Result<Self, BootSourceConfigError> {
-        use self::BootSourceConfigError::{
+impl BootSpec {
+    /// Creates the BootSpec based on a given configuration.
+    pub fn new(cfg: &BootSourceSpec) -> Result<Self, BootSourceSpecError> {
+        use self::BootSourceSpecError::{
             InvalidInitrdPath, InvalidKernelCommandLine, InvalidKernelPath,
         };
 
@@ -86,7 +86,7 @@ impl BootConfig {
             linux_loader::cmdline::Cmdline::try_from(cmdline_str, crate::arch::CMDLINE_MAX_SIZE)
                 .map_err(|err| InvalidKernelCommandLine(err.to_string()))?;
 
-        Ok(BootConfig {
+        Ok(BootSpec {
             cmdline,
             kernel_file,
             initrd_file,
@@ -106,13 +106,13 @@ pub(crate) mod tests {
         let kernel_file = TempFile::new().unwrap();
         let kernel_path = kernel_file.as_path().to_str().unwrap().to_string();
 
-        let boot_src_cfg = BootSourceConfig {
+        let boot_src_cfg = BootSourceSpec {
             boot_args: None,
             initrd_path: None,
             kernel_image_path: kernel_path,
         };
 
-        let boot_cfg = BootConfig::new(&boot_src_cfg).unwrap();
+        let boot_cfg = BootSpec::new(&boot_src_cfg).unwrap();
         assert!(boot_cfg.initrd_file.is_none());
         assert_eq!(
             boot_cfg.cmdline.as_cstring().unwrap().as_bytes_with_nul(),
@@ -122,7 +122,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_serde() {
-        let boot_src_cfg = BootSourceConfig {
+        let boot_src_cfg = BootSourceSpec {
             boot_args: Some(DEFAULT_KERNEL_CMDLINE.to_string()),
             initrd_path: Some("/tmp/initrd".to_string()),
             kernel_image_path: "./vmlinux.bin".to_string(),

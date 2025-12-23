@@ -31,9 +31,9 @@ use crate::resources::VmResources;
 use crate::seccomp::BpfThreadMap;
 use crate::snapshot::Snapshot;
 use crate::utils::u64_to_usize;
-use crate::vmm_config::boot_source::BootSourceConfig;
+use crate::vmm_config::boot_source::BootSourceSpec;
 use crate::vmm_config::instance_info::InstanceInfo;
-use crate::vmm_config::machine_config::{HugePageConfig, MachineConfigError, MachineConfigUpdate};
+use crate::vmm_config::machine_config::{HugePageConfig, MachineSpecError, MachineSpecUpdate};
 use crate::vmm_config::snapshot::{CreateSnapshotParams, LoadSnapshotParams, MemBackendType};
 use crate::vstate::kvm::KvmState;
 use crate::vstate::memory::{
@@ -53,7 +53,7 @@ pub struct VmInfo {
     /// CPU template type
     pub cpu_template: StaticCpuTemplate,
     /// Boot source information.
-    pub boot_source: BootSourceConfig,
+    pub boot_source: BootSourceSpec,
     /// Huge page configuration
     pub huge_pages: HugePageConfig,
 }
@@ -375,11 +375,11 @@ pub fn restore_from_snapshot(
         .vcpu_states
         .len()
         .try_into()
-        .map_err(|_| MachineConfigError::InvalidVcpuCount)
+        .map_err(|_| MachineSpecError::InvalidVcpuCount)
         .map_err(BuildMicrovmFromSnapshotError::VmUpdateConfig)?;
 
     vm_resources
-        .update_machine_config(&MachineConfigUpdate {
+        .update_machine_config(&MachineSpecUpdate {
             vcpu_count: Some(vcpu_count),
             mem_size_mib: Some(u64_to_usize(microvm_state.vm_info.mem_size_mib)),
             smt: Some(microvm_state.vm_info.smt),
@@ -617,8 +617,8 @@ mod tests {
     use crate::construct_kvm_mpidrs;
     use crate::devices::virtio::block::CacheType;
     use crate::snapshot::Persist;
-    use crate::vmm_config::balloon::BalloonDeviceConfig;
-    use crate::vmm_config::net::NetworkInterfaceConfig;
+    use crate::vmm_config::balloon::BalloonDeviceSpec;
+    use crate::vmm_config::net::NetworkInterfaceSpec;
     use crate::vmm_config::vsock::tests::default_config;
     use crate::vstate::memory::{GuestMemoryRegionState, GuestRegionType};
 
@@ -628,7 +628,7 @@ mod tests {
         let mut cmdline = default_kernel_cmdline();
 
         // Add a balloon device.
-        let balloon_config = BalloonDeviceConfig {
+        let balloon_config = BalloonDeviceSpec {
             amount_mib: 0,
             deflate_on_oom: false,
             stats_polling_interval_s: 0,
@@ -649,7 +649,7 @@ mod tests {
         insert_block_devices(&mut vmm, &mut cmdline, &mut event_manager, block_configs);
 
         // Add net device.
-        let network_interface = NetworkInterfaceConfig {
+        let network_interface = NetworkInterfaceSpec {
             iface_id: String::from("netif"),
             host_dev_name: String::from("hostname"),
             guest_mac: None,

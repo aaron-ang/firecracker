@@ -24,7 +24,7 @@ use crate::devices::virtio::queue::{DescriptorChain, InvalidAvailIdx, Queue, Que
 use crate::devices::virtio::transport::{VirtioInterrupt, VirtioInterruptType};
 use crate::logger::{IncMetric, error, info};
 use crate::utils::{align_up, u64_to_usize};
-use crate::vmm_config::pmem::PmemConfig;
+use crate::vmm_config::pmem::PmemSpec;
 use crate::vstate::memory::{ByteValued, Bytes, GuestMemoryMmap, GuestMmapRegion};
 use crate::vstate::vm::VmError;
 use crate::{Vm, impl_device_type};
@@ -92,7 +92,7 @@ pub struct Pmem {
     pub mmap_ptr: u64,
     pub metrics: Arc<PmemMetrics>,
 
-    pub config: PmemConfig,
+    pub config: PmemSpec,
 }
 
 impl Drop for Pmem {
@@ -112,13 +112,13 @@ impl Pmem {
     pub const ALIGNMENT: u64 = 2 * 1024 * 1024;
 
     /// Create a new Pmem device with a backing file at `disk_image_path` path.
-    pub fn new(config: PmemConfig) -> Result<Self, PmemError> {
+    pub fn new(config: PmemSpec) -> Result<Self, PmemError> {
         Self::new_with_queues(config, vec![Queue::new(PMEM_QUEUE_SIZE)])
     }
 
     /// Create a new Pmem device with a backing file at `disk_image_path` path using a pre-created
     /// set of queues.
-    pub fn new_with_queues(config: PmemConfig, queues: Vec<Queue>) -> Result<Self, PmemError> {
+    pub fn new_with_queues(config: PmemSpec, queues: Vec<Queue>) -> Result<Self, PmemError> {
         let (file, file_len, mmap_ptr, mmap_len) =
             Self::mmap_backing_file(&config.path_on_host, config.read_only)?;
 
@@ -417,7 +417,7 @@ mod tests {
 
     #[test]
     fn test_from_config() {
-        let config = PmemConfig {
+        let config = PmemSpec {
             id: "1".into(),
             path_on_host: "not_a_path".into(),
             root_device: true,
@@ -430,7 +430,7 @@ mod tests {
 
         let dummy_file = TempFile::new().unwrap();
         let dummy_path = dummy_file.as_path().to_str().unwrap().to_string();
-        let config = PmemConfig {
+        let config = PmemSpec {
             id: "1".into(),
             path_on_host: dummy_path.clone(),
             root_device: true,
@@ -442,7 +442,7 @@ mod tests {
         ));
 
         dummy_file.as_file().set_len(0x20_0000);
-        let config = PmemConfig {
+        let config = PmemSpec {
             id: "1".into(),
             path_on_host: dummy_path,
             root_device: true,
@@ -456,7 +456,7 @@ mod tests {
         let dummy_file = TempFile::new().unwrap();
         dummy_file.as_file().set_len(0x20_0000);
         let dummy_path = dummy_file.as_path().to_str().unwrap().to_string();
-        let config = PmemConfig {
+        let config = PmemSpec {
             id: "1".into(),
             path_on_host: dummy_path,
             root_device: true,
